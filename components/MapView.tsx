@@ -1,0 +1,155 @@
+'use client';
+
+import { useEffect, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { City, Category, Location } from '@/types';
+
+interface MapViewProps {
+  cities: City[];
+  selectedCity: City | null;
+  onCitySelect: (city: City) => void;
+  locations: Location[];
+  onLocationSelect: (location: Location) => void;
+}
+
+const categoryColors: Record<Category, string> = {
+  'Favorite': '#FF6B6B',
+  'Visited': '#4ECDC4',
+  'Want to Visit': '#FFE66D',
+};
+
+export default function MapView({ cities, selectedCity, onCitySelect, locations, onLocationSelect }: MapViewProps) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const markers = useRef<mapboxgl.Marker[]>([]);
+  const locationMarkers = useRef<mapboxgl.Marker[]>([]);
+
+  useEffect(() => {
+    if (!mapContainer.current) return;
+    
+    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    if (!token) {
+      console.error('Mapbox token not found. Please set NEXT_PUBLIC_MAPBOX_TOKEN in .env.local');
+      if (mapContainer.current) {
+        mapContainer.current.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: center; height: 100%; background: #f5f5f5; color: #666; padding: 20px; text-align: center;">
+            <div>
+              <h3>Mapbox Token Required</h3>
+              <p>Please set NEXT_PUBLIC_MAPBOX_TOKEN in your .env.local file</p>
+            </div>
+          </div>
+        `;
+      }
+      return;
+    }
+
+    mapboxgl.accessToken = token;
+
+    if (!map.current) {
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [0, 20],
+        zoom: 2,
+      });
+
+      map.current.on('load', () => {
+        console.log('Map loaded successfully');
+      });
+
+      map.current.on('error', (e) => {
+        console.error('Map error:', e);
+      });
+    }
+
+    return () => {
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+    };
+  }, []);
+
+  // Update markers when cities change
+  useEffect(() => {
+    if (!map.current) return;
+
+    // Remove existing city markers
+    markers.current.forEach(marker => marker.remove());
+    markers.current = [];
+
+    // Add new city markers
+    cities.forEach(city => {
+      const marker = new mapboxgl.Marker({
+        color: categoryColors[city.category],
+      })
+        .setLngLat([city.lng, city.lat])
+        .addTo(map.current!);
+
+      marker.getElement().addEventListener('click', () => {
+        onCitySelect(city);
+      });
+
+      markers.current.push(marker);
+    });
+  }, [cities, onCitySelect]);
+
+  // Update location markers when locations change
+  useEffect(() => {
+    if (!map.current) return;
+
+    // Remove existing location markers
+    locationMarkers.current.forEach(marker => marker.remove());
+    locationMarkers.current = [];
+
+    // Add new location markers (only show when a city is selected)
+    if (selectedCity && locations.length > 0) {
+      locations.forEach(location => {
+        // Create a custom marker element
+        const el = document.createElement('div');
+        el.className = 'location-marker';
+        el.style.width = '20px';
+        el.style.height = '20px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = '#9C27B0';
+        el.style.border = '3px solid white';
+        el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+        el.style.cursor = 'pointer';
+
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat([location.lng, location.lat])
+          .addTo(map.current!);
+
+        marker.getElement().addEventListener('click', () => {
+          onLocationSelect(location);
+        });
+
+        locationMarkers.current.push(marker);
+      });
+    }
+  }, [locations, selectedCity, onLocationSelect]);
+
+  // Fly to selected city
+  useEffect(() => {
+    if (!map.current || !selectedCity) return;
+
+    map.current.flyTo({
+      center: [selectedCity.lng, selectedCity.lat],
+      zoom: 10,
+      duration: 1500,
+    });
+  }, [selectedCity]);
+
+  return (
+    <div
+      ref={mapContainer}
+      style={{
+        width: '100%',
+        height: '100vh',
+        position: 'relative',
+      }}
+    />
+  );
+}
+
