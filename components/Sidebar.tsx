@@ -449,7 +449,6 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
                 key={city.id}
                 onClick={() => onCitySelect(city)}
                 style={{
-                  padding: '8px',
                   border: '1px solid #e0e0e0',
                   borderRadius: '4px',
                   cursor: 'pointer',
