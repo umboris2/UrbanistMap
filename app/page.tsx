@@ -8,7 +8,7 @@ import PhotoStrip from '@/components/PhotoStrip';
 import LocationPopup from '@/components/LocationPopup';
 import LocationFilters from '@/components/LocationFilters';
 import { City, Photo, Location } from '@/types';
-import { loadCities } from '@/lib/storage';
+import { loadCities, saveCities } from '@/lib/storage';
 import { loadLocationsForCity } from '@/lib/locations';
 
 export default function Home() {
@@ -56,7 +56,25 @@ export default function Home() {
   }, [selectedCity?.id]); // Only trigger when city ID changes
 
   useEffect(() => {
-    setCities(loadCities());
+    // Load cities on mount
+    const loadedCities = loadCities();
+    setCities(loadedCities);
+    console.log('App initialized, loaded cities:', loadedCities.length);
+    
+    // Test localStorage is working
+    try {
+      const testKey = 'urbanist-map-test';
+      localStorage.setItem(testKey, 'test');
+      const testValue = localStorage.getItem(testKey);
+      localStorage.removeItem(testKey);
+      if (testValue !== 'test') {
+        console.error('localStorage test failed - storage may not be working');
+      } else {
+        console.log('localStorage is working correctly');
+      }
+    } catch (error) {
+      console.error('localStorage is not available:', error);
+    }
   }, []);
 
   // Load locations when city is selected

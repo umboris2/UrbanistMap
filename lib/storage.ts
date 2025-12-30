@@ -4,11 +4,20 @@ const CITIES_KEY = 'urbanist-map-cities';
 const PHOTOS_CACHE_KEY = 'urbanist-map-photos-cache';
 
 export function loadCities(): City[] {
-  if (typeof window === 'undefined') return [];
+  if (typeof window === 'undefined') {
+    console.warn('Cannot load cities: window is undefined (server-side)');
+    return [];
+  }
   
   try {
     const data = localStorage.getItem(CITIES_KEY);
-    return data ? JSON.parse(data) : [];
+    if (!data) {
+      console.log('No cities found in localStorage');
+      return [];
+    }
+    const cities = JSON.parse(data);
+    console.log(`Loaded ${cities.length} cities from localStorage`);
+    return cities;
   } catch (error) {
     console.error('Error loading cities:', error);
     return [];
@@ -16,12 +25,21 @@ export function loadCities(): City[] {
 }
 
 export function saveCities(cities: City[]): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined') {
+    console.warn('Cannot save cities: window is undefined (server-side)');
+    return;
+  }
   
   try {
-    localStorage.setItem(CITIES_KEY, JSON.stringify(cities));
+    const json = JSON.stringify(cities);
+    localStorage.setItem(CITIES_KEY, json);
+    console.log(`Saved ${cities.length} cities to localStorage`);
   } catch (error) {
     console.error('Error saving cities:', error);
+    // Check if it's a quota exceeded error
+    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+      console.error('localStorage quota exceeded. Try clearing some data.');
+    }
   }
 }
 
