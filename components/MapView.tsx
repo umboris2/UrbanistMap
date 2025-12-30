@@ -14,9 +14,9 @@ interface MapViewProps {
 }
 
 const categoryColors: Record<Category, string> = {
-  'Favorite': '#FF6B6B',
-  'Visited': '#4ECDC4',
-  'Want to Visit': '#FFE66D',
+  'Tier 1': '#FF6B6B',
+  'Tier 2': '#4ECDC4',
+  'Tier 3': '#FFE66D',
 };
 
 export default function MapView({ cities, selectedCity, onCitySelect, locations, onLocationSelect }: MapViewProps) {
@@ -56,6 +56,35 @@ export default function MapView({ cities, selectedCity, onCitySelect, locations,
 
       map.current.on('load', () => {
         console.log('Map loaded successfully');
+        
+        // Enable transit layers in the map style
+        // Mapbox Streets style includes transit layers that show at higher zoom levels
+        if (map.current) {
+          const style = map.current.getStyle();
+          if (style && style.layers) {
+            // Make transit layers more visible
+            style.layers.forEach((layer: any) => {
+              if (layer.id && (
+                layer.id.includes('transit') || 
+                layer.id.includes('rail') ||
+                layer.id.includes('subway')
+              )) {
+                // Ensure transit layers are visible
+                map.current!.setLayoutProperty(layer.id, 'visibility', 'visible');
+                // Make them more prominent if it's a line layer
+                if (layer.type === 'line') {
+                  map.current!.setPaintProperty(layer.id, 'line-width', [
+                    'interpolate',
+                    ['linear'],
+                    ['zoom'],
+                    10, 1,
+                    15, 3
+                  ]);
+                }
+              }
+            });
+          }
+        }
       });
 
       map.current.on('error', (e) => {

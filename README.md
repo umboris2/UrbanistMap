@@ -5,7 +5,7 @@ A minimal web app for tracking cities on an interactive map. Built with Next.js 
 ## Features
 
 - 🗺️ Interactive map with Mapbox GL JS
-- 🏙️ Add cities with categories (Favorite, Visited, Want to Visit)
+- 🏙️ Add cities with categories (Tier 1, Tier 2, Tier 3)
 - 🔍 City search with Mapbox Geocoding API
 - 🎨 Color-coded markers by category
 - 📸 City photos from Wikimedia Commons

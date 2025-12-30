@@ -21,6 +21,28 @@ export default function Home() {
   const [locationsLoading, setLocationsLoading] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  
+  // Mobile panel states - start with only sidebar open
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [photoStripOpen, setPhotoStripOpen] = useState(false);
+  const [locationFiltersOpen, setLocationFiltersOpen] = useState(false);
+  const [cityInfoOpen, setCityInfoOpen] = useState(false);
+  
+  // Auto-open/close panels when city is selected
+  useEffect(() => {
+    if (selectedCity) {
+      // Close sidebar, open other panels
+      setSidebarOpen(false);
+      setCityInfoOpen(true);
+      setPhotoStripOpen(true);
+    } else {
+      // Reset to initial state when no city selected
+      setSidebarOpen(true);
+      setCityInfoOpen(false);
+      setPhotoStripOpen(false);
+      setLocationFiltersOpen(false);
+    }
+  }, [selectedCity?.id]); // Only trigger when city ID changes
 
   useEffect(() => {
     setCities(loadCities());
@@ -36,6 +58,10 @@ export default function Home() {
           setLocationsLoading(false);
           // Default: no categories selected (shows all)
           setSelectedCategories(new Set());
+          // Open location filters if locations exist
+          if (loadedLocations.length > 0) {
+            setLocationFiltersOpen(true);
+          }
         })
         .catch(error => {
           console.error('Error loading locations:', error);
@@ -92,8 +118,18 @@ export default function Home() {
         onPhotosLoadingChange={setPhotosLoading}
         onPhotoSearchChange={handlePhotoSearchChange}
         photoSearchQuery={photoSearchQuery}
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
       />
-      <div style={{ marginLeft: '320px', width: 'calc(100% - 320px)', height: '100vh', position: 'relative' }}>
+      <div 
+        style={{ 
+          marginLeft: sidebarOpen ? '320px' : '0',
+          width: sidebarOpen ? 'calc(100% - 320px)' : '100%',
+          height: '100vh', 
+          position: 'relative',
+          transition: 'margin-left 0.3s ease, width 0.3s ease',
+        }}
+      >
         <MapView
           cities={cities}
           selectedCity={selectedCity}
@@ -101,12 +137,18 @@ export default function Home() {
           locations={filteredLocations}
           onLocationSelect={handleLocationSelect}
         />
-        <CityInfo city={selectedCity} />
+        <CityInfo 
+          city={selectedCity} 
+          isOpen={cityInfoOpen}
+          onToggle={() => setCityInfoOpen(!cityInfoOpen)}
+        />
         {selectedCity && locations.length > 0 && (
           <LocationFilters
             locations={locations}
             selectedCategories={selectedCategories}
             onCategoryToggle={handleCategoryToggle}
+            isOpen={locationFiltersOpen}
+            onToggle={() => setLocationFiltersOpen(!locationFiltersOpen)}
           />
         )}
         {selectedCity && (
@@ -115,6 +157,8 @@ export default function Home() {
             loading={photosLoading}
             onSearchChange={handlePhotoSearchChange}
             currentSearchQuery={photoSearchQuery}
+            isOpen={photoStripOpen}
+            onToggle={() => setPhotoStripOpen(!photoStripOpen)}
           />
         )}
         {selectedLocation && (

@@ -6,9 +6,11 @@ import { fetchWeather, WeatherData } from '@/lib/weather';
 
 interface CityInfoProps {
   city: City | null;
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
-export default function CityInfo({ city }: CityInfoProps) {
+export default function CityInfo({ city, isOpen, onToggle }: CityInfoProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
 
@@ -42,7 +44,7 @@ export default function CityInfo({ city }: CityInfoProps) {
     <div
       style={{
         position: 'absolute',
-        top: '16px',
+        top: isOpen ? '16px' : '-200px',
         left: '16px',
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(10px)',
@@ -51,8 +53,43 @@ export default function CityInfo({ city }: CityInfoProps) {
         boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
         maxWidth: '320px',
         zIndex: 1000,
+        transition: 'top 0.3s ease',
       }}
     >
+      {/* Toggle button */}
+      <button
+        onClick={onToggle}
+        style={{
+          position: 'absolute',
+          bottom: isOpen ? '-40px' : '-40px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '48px',
+          height: '40px',
+          borderRadius: '0 0 12px 12px',
+          border: '2px solid #666',
+          backgroundColor: '#666',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '20px',
+          color: '#fff',
+          fontWeight: 'bold',
+          transition: 'all 0.2s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#555';
+          e.currentTarget.style.transform = 'translateX(-50%) scale(1.1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = '#666';
+          e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
+        }}
+      >
+        {isOpen ? '▼' : '▲'}
+      </button>
       <h2 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 600 }}>
         {city.name}
       </h2>

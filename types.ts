@@ -1,4 +1,4 @@
-export type Category = 'Favorite' | 'Visited' | 'Want to Visit';
+export type Category = 'Tier 1' | 'Tier 2' | 'Tier 3';
 
 export interface City {
   id: string;

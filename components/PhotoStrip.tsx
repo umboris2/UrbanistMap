@@ -8,9 +8,11 @@ interface PhotoStripProps {
   loading: boolean;
   onSearchChange: (query: string) => void;
   currentSearchQuery: string;
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
-export default function PhotoStrip({ photos, loading, onSearchChange, currentSearchQuery }: PhotoStripProps) {
+export default function PhotoStrip({ photos, loading, onSearchChange, currentSearchQuery, isOpen, onToggle }: PhotoStripProps) {
   const [searchInput, setSearchInput] = useState(currentSearchQuery || '');
 
   // Sync input with prop when it changes (e.g., when city changes)
@@ -23,12 +25,17 @@ export default function PhotoStrip({ photos, loading, onSearchChange, currentSea
     onSearchChange(searchInput.trim());
   };
 
+  // Calculate max height based on content
+  const maxHeight = isOpen ? (photos.length > 0 ? '300px' : '200px') : '0px';
+  const bottom = isOpen ? '0' : '-300px';
+  const panelHeight = photos.length > 0 ? 300 : 200;
+
   if (loading) {
     return (
       <div
         style={{
           position: 'absolute',
-          bottom: '0',
+          bottom: bottom,
           left: '0',
           right: '0',
           padding: '12px',
@@ -36,6 +43,8 @@ export default function PhotoStrip({ photos, loading, onSearchChange, currentSea
           color: '#666',
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(10px)',
+          transition: 'bottom 0.3s ease',
+          zIndex: 1000,
         }}
       >
         Loading photos...
@@ -44,18 +53,60 @@ export default function PhotoStrip({ photos, loading, onSearchChange, currentSea
   }
 
   return (
-    <div
-      style={{
-        position: 'absolute',
-        bottom: '0',
-        left: '0',
-        right: '0',
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(10px)',
-        boxShadow: '0 -2px 8px rgba(0,0,0,0.1)',
-        zIndex: 1000,
-      }}
-    >
+    <>
+      {/* Toggle button - always visible, fixed position */}
+      <button
+        onClick={onToggle}
+        style={{
+          position: 'fixed',
+          bottom: isOpen ? `${panelHeight}px` : '0',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1001,
+          width: '48px',
+          height: '40px',
+          borderRadius: '12px 12px 0 0',
+          border: '2px solid #666',
+          borderBottom: isOpen ? 'none' : '2px solid #666',
+          backgroundColor: '#666',
+          boxShadow: '0 -4px 12px rgba(0,0,0,0.3)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '16px',
+          color: '#fff',
+          fontWeight: 'bold',
+          transition: 'bottom 0.3s ease',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#555';
+          e.currentTarget.style.transform = 'translateX(-50%) scale(1.1)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = '#666';
+          e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
+        }}
+      >
+        {isOpen ? '▼' : '▲'}
+      </button>
+      <div
+        style={{
+          position: 'absolute',
+          bottom: bottom,
+          left: '0',
+          right: '0',
+          maxHeight: maxHeight,
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          backdropFilter: 'blur(10px)',
+          boxShadow: '0 -2px 8px rgba(0,0,0,0.1)',
+          zIndex: 1000,
+          transition: 'bottom 0.3s ease, max-height 0.3s ease',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
       {/* Search Box */}
       <div style={{ padding: '12px', borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
         <form onSubmit={handleSearch} style={{ display: 'flex', gap: '8px' }}>
@@ -165,7 +216,8 @@ export default function PhotoStrip({ photos, loading, onSearchChange, currentSea
           ))}
         </div>
       ) : null}
-    </div>
+      </div>
+    </>
   );
 }
 

@@ -33,60 +33,128 @@ export async function loadLocationsForCity(cityName: string): Promise<Location[]
       return [];
     }
 
-    const locations: Location[] = [];
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    // First, collect all locations that need geocoding
+    const locationsToGeocode: Array<{
+      name: string;
+      address: string;
+      description: string;
+      wikipediaUrl: string;
+      category: string;
+      cityName: string;
+      index: number;
+    }> = [];
 
-    // Parse rows
+    // Parse rows and collect addresses
     for (let i = 1; i < lines.length; i++) {
       const row = parseCSVRow(lines[i]);
       if (row.length < Math.max(cityIdx, nameIdx, addressIdx, descIdx, urlIdx) + 1) continue;
 
       const rowCity = row[cityIdx]?.trim();
-      
-      // Only process locations for the selected city
       if (!rowCity || rowCity.toLowerCase() !== cityName.toLowerCase()) {
         continue;
       }
 
       const name = row[nameIdx]?.trim();
       const address = row[addressIdx]?.trim();
-      const description = row[descIdx]?.trim() || ''; // Allow empty description
+      const description = row[descIdx]?.trim() || '';
       const wikipediaUrl = row[urlIdx]?.trim();
       const category = categoryIdx >= 0 ? row[categoryIdx]?.trim() || 'Other' : 'Other';
 
-      // Only require name and address
       if (!name || !address) continue;
 
-      // Geocode address to get lat/lng
+      locationsToGeocode.push({
+        name,
+        address,
+        description,
+        wikipediaUrl: wikipediaUrl || '',
+        category,
+        cityName: rowCity,
+        index: i,
+      });
+    }
+
+    // Load geocoding cache
+    const GEOCODE_CACHE_KEY = 'urbanist-map-geocode-cache';
+    let geocodeCache: Record<string, { lat: number; lng: number }> = {};
+
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(GEOCODE_CACHE_KEY);
+        if (cached) {
+          geocodeCache = JSON.parse(cached);
+        }
+      } catch (error) {
+        console.error('Error loading geocode cache:', error);
+      }
+    }
+
+    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+
+    // Geocode all addresses in parallel (with caching)
+    const geocodePromises = locationsToGeocode.map(async (loc) => {
+      // Check cache first
+      const cacheKey = `${loc.address}-${loc.cityName}`;
+      if (geocodeCache[cacheKey]) {
+        return {
+          ...loc,
+          lat: geocodeCache[cacheKey].lat,
+          lng: geocodeCache[cacheKey].lng,
+        };
+      }
+
+      // Geocode if not cached
       if (!token) {
-        console.warn('Mapbox token not found, skipping geocoding');
-        continue;
+        return null;
       }
 
       try {
-        const result = await geocodeAddress(address, token);
+        const result = await geocodeAddress(loc.address, token);
         if (!result) {
-          console.warn(`Could not geocode address: ${address}`);
-          continue;
+          return null;
         }
 
         const [lng, lat] = result.center;
+        
+        // Save to cache
+        geocodeCache[cacheKey] = { lat, lng };
+        
+        // Update cache in localStorage
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(GEOCODE_CACHE_KEY, JSON.stringify(geocodeCache));
+          } catch (error) {
+            // Cache might be full, that's okay
+          }
+        }
 
-        locations.push({
-          id: `${cityName}-${i}-${Date.now()}`,
-          cityName: rowCity,
-          name,
-          address,
-          description,
-          wikipediaUrl: wikipediaUrl || '',
-          category,
+        return {
+          ...loc,
           lat,
           lng,
-        });
+        };
       } catch (error) {
-        console.error(`Error geocoding ${address}:`, error);
+        console.error(`Error geocoding ${loc.address}:`, error);
+        return null;
       }
-    }
+    });
+
+    // Wait for all geocoding to complete in parallel
+    const geocodedResults = await Promise.all(geocodePromises);
+
+    // Build locations array
+    const locations: Location[] = geocodedResults
+      .filter((result): result is NonNullable<typeof result> => result !== null)
+      .map((result, idx) => ({
+        id: `${cityName}-${result.index}-${Date.now()}-${idx}`,
+        cityName: result.cityName,
+        name: result.name,
+        address: result.address,
+        description: result.description,
+        wikipediaUrl: result.wikipediaUrl,
+        category: result.category,
+        lat: result.lat,
+        lng: result.lng,
+      }));
 
     return locations;
   } catch (error) {

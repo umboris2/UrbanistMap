@@ -16,14 +16,16 @@ interface SidebarProps {
   onPhotosLoadingChange: (loading: boolean) => void;
   onPhotoSearchChange: (query: string) => void;
   photoSearchQuery: string;
+  isOpen: boolean;
+  onToggle: () => void;
 }
 
-export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesChange, onPhotosChange, onPhotosLoadingChange, onPhotoSearchChange, photoSearchQuery }: SidebarProps) {
+export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesChange, onPhotosChange, onPhotosLoadingChange, onPhotoSearchChange, photoSearchQuery, isOpen, onToggle }: SidebarProps) {
   const [filter, setFilter] = useState<Category | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedSearchResult, setSelectedSearchResult] = useState<any>(null);
-  const [selectedCategory, setSelectedCategory] = useState<Category>('Want to Visit');
+  const [selectedCategory, setSelectedCategory] = useState<Category>('Tier 3');
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
   const [cityPhotos, setCityPhotos] = useState<Record<string, Photo | null>>({});
@@ -193,18 +195,94 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
     : cities.filter(c => c.category === filter);
 
   const categoryColors: Record<Category, string> = {
-    'Favorite': '#FF6B6B',
-    'Visited': '#4ECDC4',
-    'Want to Visit': '#FFE66D',
+    'Tier 1': '#FF6B6B',
+    'Tier 2': '#4ECDC4',
+    'Tier 3': '#FFE66D',
   };
 
   return (
-    <div
+    <>
+      {/* Toggle button when closed */}
+      {!isOpen && (
+        <button
+          onClick={onToggle}
+          style={{
+            position: 'fixed',
+            left: '8px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 1001,
+            width: '48px',
+            height: '64px',
+            borderRadius: '0 12px 12px 0',
+            border: '2px solid #666',
+            backgroundColor: '#666',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '24px',
+            color: '#fff',
+            fontWeight: 'bold',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#555';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#666';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+          }}
+        >
+          →
+        </button>
+      )}
+      {/* Toggle button when open - always visible */}
+      {isOpen && (
+        <button
+          onClick={onToggle}
+          style={{
+            position: 'fixed',
+            left: '320px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 1001,
+            width: '48px',
+            height: '64px',
+            borderRadius: '0 12px 12px 0',
+            border: '2px solid #666',
+            backgroundColor: '#666',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '24px',
+            color: '#fff',
+            fontWeight: 'bold',
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#555';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#666';
+            e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+          }}
+        >
+          ←
+        </button>
+      )}
+      <div
       style={{
         width: '320px',
+        maxWidth: '320px',
         height: '100vh',
         position: 'fixed',
-        left: 0,
+        left: isOpen ? 0 : '-320px',
         top: 0,
         backgroundColor: '#fff',
         borderRight: '1px solid #e0e0e0',
@@ -212,8 +290,11 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
         flexDirection: 'column',
         zIndex: 1000,
         overflowY: 'auto',
+        overflowX: 'hidden',
+        transition: 'left 0.3s ease',
+        boxSizing: 'border-box',
       }}
-    >
+      >
       {/* Add City Section */}
       <div style={{ padding: '16px', borderBottom: '1px solid #e0e0e0' }}>
         <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 600 }}>
@@ -293,9 +374,9 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
             boxSizing: 'border-box',
           }}
         >
-          <option value="Favorite">Favorite</option>
-          <option value="Visited">Visited</option>
-          <option value="Want to Visit">Want to Visit</option>
+          <option value="Tier 1">Tier 1</option>
+          <option value="Tier 2">Tier 2</option>
+          <option value="Tier 3">Tier 3</option>
         </select>
 
         <button
@@ -346,9 +427,9 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
           }}
         >
           <option value="All">All</option>
-          <option value="Favorite">Favorite</option>
-          <option value="Visited">Visited</option>
-          <option value="Want to Visit">Want to Visit</option>
+          <option value="Tier 1">Tier 1</option>
+          <option value="Tier 2">Tier 2</option>
+          <option value="Tier 3">Tier 3</option>
         </select>
       </div>
 
@@ -377,6 +458,8 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
                   display: 'flex',
                   gap: '8px',
                   alignItems: 'center',
+                  padding: '8px 12px',
+                  boxSizing: 'border-box',
                 }}
                 onMouseEnter={(e) => {
                   if (selectedCity?.id !== city.id) {
@@ -422,12 +505,12 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
                 </div>
 
                 {/* City info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ flex: 1, minWidth: 0, marginRight: '8px' }}>
                   <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {city.name}
                   </div>
                   {city.country && (
-                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '4px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {city.country}
                     </div>
                   )}
@@ -479,7 +562,8 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
