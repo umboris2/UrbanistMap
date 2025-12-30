@@ -177,6 +177,8 @@ export default function MapView({ cities, selectedCity, onCitySelect, locations,
         width: '100%',
         height: '100vh',
         position: 'relative',
+        maxWidth: '100%',
+        overflow: 'hidden',
       }}
     />
   );

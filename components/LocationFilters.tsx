@@ -65,7 +65,11 @@ export default function LocationFilters({ locations, selectedCategories, onCateg
           boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
           zIndex: 1000,
           maxWidth: '250px',
+          width: '250px',
           transition: 'right 0.3s ease',
+          boxSizing: 'border-box',
+          // Ensure it doesn't affect parent layout
+          pointerEvents: isOpen ? 'auto' : 'none',
         }}
       >
       <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: '#666' }}>

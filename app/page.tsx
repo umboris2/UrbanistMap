@@ -29,11 +29,12 @@ export default function Home() {
   const [cityInfoOpen, setCityInfoOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Detect mobile screen size
+  // Detect mobile screen size - only on client side
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768);
     };
+    // Check immediately
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -137,7 +138,19 @@ export default function Home() {
     : locations.filter(loc => selectedCategories.has(loc.category));
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ 
+      display: 'flex', 
+      height: '100vh', 
+      width: '100vw',
+      overflow: 'hidden',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      margin: 0,
+      padding: 0,
+    }}>
       <Sidebar 
         onCitySelect={setSelectedCity} 
         selectedCity={selectedCity}
@@ -152,11 +165,12 @@ export default function Home() {
       />
       <div 
         style={{ 
-          marginLeft: sidebarOpen && !isMobile ? '320px' : '0',
-          width: sidebarOpen && !isMobile ? 'calc(100% - 320px)' : '100%',
+          flex: 1,
           height: '100vh', 
+          width: '100%',
           position: 'relative',
-          transition: 'margin-left 0.3s ease, width 0.3s ease',
+          overflow: 'hidden',
+          minWidth: 0,
         }}
       >
         {/* Backdrop for mobile sidebar */}

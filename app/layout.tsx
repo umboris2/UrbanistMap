@@ -24,15 +24,34 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" style={{ width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#4CAF50" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Urbanist Map" />
+        <style>{`
+          * {
+            box-sizing: border-box;
+          }
+          html, body {
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+          }
+        `}</style>
       </head>
-      <body style={{ margin: 0, padding: 0, fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <body style={{ 
+        margin: 0, 
+        padding: 0, 
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        width: '100%',
+        maxWidth: '100vw',
+        overflowX: 'hidden',
+      }}>
         {children}
       </body>
     </html>

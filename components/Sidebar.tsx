@@ -29,8 +29,19 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
   const [cityPhotos, setCityPhotos] = useState<Record<string, Photo | null>>({});
+  const [isDesktop, setIsDesktop] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Detect desktop on client side only
+  useEffect(() => {
+    const checkDesktop = () => {
+      setIsDesktop(window.innerWidth > 768);
+    };
+    checkDesktop();
+    window.addEventListener('resize', checkDesktop);
+    return () => window.removeEventListener('resize', checkDesktop);
+  }, []);
 
   // Load skyline photos for all cities (for thumbnails in city bars)
   useEffect(() => {
@@ -239,8 +250,8 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
           →
         </button>
       )}
-      {/* Toggle button when open - always visible */}
-      {isOpen && (
+      {/* Toggle button when open - always visible, but only on desktop */}
+      {isOpen && isDesktop && (
         <button
           onClick={onToggle}
           style={{
@@ -293,6 +304,8 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
         overflowX: 'hidden',
         transition: 'left 0.3s ease',
         boxSizing: 'border-box',
+        // Ensure sidebar doesn't extend beyond viewport
+        right: 'auto',
       }}
       >
       {/* Add City Section */}
