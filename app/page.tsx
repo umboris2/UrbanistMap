@@ -27,6 +27,17 @@ export default function Home() {
   const [photoStripOpen, setPhotoStripOpen] = useState(false);
   const [locationFiltersOpen, setLocationFiltersOpen] = useState(false);
   const [cityInfoOpen, setCityInfoOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // Auto-open/close panels when city is selected
   useEffect(() => {
@@ -123,13 +134,28 @@ export default function Home() {
       />
       <div 
         style={{ 
-          marginLeft: sidebarOpen ? '320px' : '0',
-          width: sidebarOpen ? 'calc(100% - 320px)' : '100%',
+          marginLeft: sidebarOpen && !isMobile ? '320px' : '0',
+          width: sidebarOpen && !isMobile ? 'calc(100% - 320px)' : '100%',
           height: '100vh', 
           position: 'relative',
           transition: 'margin-left 0.3s ease, width 0.3s ease',
         }}
       >
+        {/* Backdrop for mobile sidebar */}
+        {sidebarOpen && isMobile && (
+          <div
+            onClick={() => setSidebarOpen(false)}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 999,
+            }}
+          />
+        )}
         <MapView
           cities={cities}
           selectedCity={selectedCity}
