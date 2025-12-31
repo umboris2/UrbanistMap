@@ -1,6 +1,7 @@
 import { Location } from '@/types';
 import { geocodeAddress } from './mapbox';
 import { fetchCitySkyline } from './wikimedia';
+import { normalizeCityName, cityNamesMatch } from './cityNameUtils';
 
 /**
  * Parse CSV file and load locations for a specific city
@@ -8,19 +9,30 @@ import { fetchCitySkyline } from './wikimedia';
  */
 export async function loadLocationsForCity(cityName: string): Promise<Location[]> {
   try {
+    console.log(`[loadLocationsForCity] Starting load for city: "${cityName}"`);
+    
     // Fetch the CSV file
     const response = await fetch('/sites_of_interest.csv');
     if (!response.ok) {
-      console.warn('Could not load sites_of_interest.csv');
+      console.warn('[loadLocationsForCity] Could not load sites_of_interest.csv:', response.status, response.statusText);
       return [];
     }
 
     const csvText = await response.text();
+    console.log(`[loadLocationsForCity] CSV loaded, length: ${csvText.length}`);
+    
     const lines = csvText.split('\n').filter(line => line.trim());
-    if (lines.length < 2) return [];
+    console.log(`[loadLocationsForCity] CSV has ${lines.length} lines`);
+    
+    if (lines.length < 2) {
+      console.warn('[loadLocationsForCity] CSV has too few lines');
+      return [];
+    }
 
-    // Parse header
-    const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+    // Parse header using parseCSVRow to handle quoted fields
+    const header = parseCSVRow(lines[0]).map(h => h.trim().toLowerCase());
+    console.log('[loadLocationsForCity] CSV header:', header);
+    
     const cityIdx = header.findIndex(h => h === 'city');
     const nameIdx = header.findIndex(h => h === 'name');
     const addressIdx = header.findIndex(h => h === 'address');
@@ -28,8 +40,10 @@ export async function loadLocationsForCity(cityName: string): Promise<Location[]
     const urlIdx = header.findIndex(h => h === 'source_url' || h.includes('wikipedia') || h.includes('url'));
     const categoryIdx = header.findIndex(h => h === 'category');
 
+    console.log('[loadLocationsForCity] Column indices:', { cityIdx, nameIdx, addressIdx, descIdx, urlIdx, categoryIdx });
+
     if (cityIdx === -1 || nameIdx === -1 || addressIdx === -1 || descIdx === -1 || urlIdx === -1) {
-      console.error('CSV format error: missing required columns');
+      console.error('[loadLocationsForCity] CSV format error: missing required columns');
       return [];
     }
 
@@ -45,15 +59,58 @@ export async function loadLocationsForCity(cityName: string): Promise<Location[]
     }> = [];
 
     // Parse rows and collect addresses
+    const normalizedCityName = normalizeCityName(cityName);
+    console.log(`[loadLocationsForCity] ========================================`);
+    console.log(`[loadLocationsForCity] Looking for city: "${cityName}"`);
+    console.log(`[loadLocationsForCity] Normalized search term: "${normalizedCityName}"`);
+    console.log(`[loadLocationsForCity] (Handles variations: Roma->Rome, Tel Aviv-Yafo->Tel Aviv, etc.)`);
+    console.log(`[loadLocationsForCity] ========================================`);
+    
+    let matchCount = 0;
+    let checkedCount = 0;
+    
     for (let i = 1; i < lines.length; i++) {
       const row = parseCSVRow(lines[i]);
-      if (row.length < Math.max(cityIdx, nameIdx, addressIdx, descIdx, urlIdx) + 1) continue;
-
-      const rowCity = row[cityIdx]?.trim();
-      if (!rowCity || rowCity.toLowerCase() !== cityName.toLowerCase()) {
+      if (row.length < Math.max(cityIdx, nameIdx, addressIdx, descIdx, urlIdx) + 1) {
+        if (i <= 5) console.log(`[loadLocationsForCity] Row ${i} too short: ${row.length} columns`);
         continue;
       }
 
+      const rowCity = row[cityIdx]?.trim();
+      if (!rowCity) continue;
+      
+      checkedCount++;
+      const normalizedRowCity = normalizeCityName(rowCity);
+      
+      // Log rows for debugging specific cities or first 20 rows
+      const cityNameLower = normalizedCityName.toLowerCase();
+      const rowCityLower = normalizedRowCity.toLowerCase();
+      const shouldLog = checkedCount <= 20 || 
+                        rowCityLower.includes(cityNameLower) ||
+                        cityNameLower.includes(rowCityLower) ||
+                        rowCity.toLowerCase().includes(cityNameLower) ||
+                        cityNameLower.includes('tokyo') ||
+                        cityNameLower.includes('tel aviv') ||
+                        cityNameLower.includes('copenhagen') ||
+                        cityNameLower.includes('beijing');
+      
+      if (shouldLog) {
+        const isMatch = normalizedRowCity === normalizedCityName;
+        console.log(`[loadLocationsForCity] Row ${i}: city="${rowCity}" (normalized: "${normalizedRowCity}") | Looking for: "${cityName}" (normalized: "${normalizedCityName}") | Match: ${isMatch}`);
+        if (isMatch) {
+          console.log(`[loadLocationsForCity] ✓ MATCH FOUND! Row ${i} matches!`);
+        }
+      }
+      
+      // Use generalized matching function
+      if (cityNamesMatch(rowCity, cityName)) {
+        matchCount++;
+        console.log(`[loadLocationsForCity] ✓ Found match at row ${i}: "${rowCity}" matches "${cityName}"`);
+      } else {
+        continue;
+      }
+      
+      // If we get here, we have a match - extract the location data
       const name = row[nameIdx]?.trim();
       const address = row[addressIdx]?.trim();
       const description = row[descIdx]?.trim() || '';
@@ -72,6 +129,13 @@ export async function loadLocationsForCity(cityName: string): Promise<Location[]
         index: i,
       });
     }
+
+    console.log(`[loadLocationsForCity] ========================================`);
+    console.log(`[loadLocationsForCity] Summary for "${cityName}":`);
+    console.log(`[loadLocationsForCity] - Checked ${checkedCount} rows`);
+    console.log(`[loadLocationsForCity] - Found ${matchCount} matching rows`);
+    console.log(`[loadLocationsForCity] - Collected ${locationsToGeocode.length} locations to geocode`);
+    console.log(`[loadLocationsForCity] ========================================`);
 
     // Load geocoding cache
     const GEOCODE_CACHE_KEY = 'urbanist-map-geocode-cache';

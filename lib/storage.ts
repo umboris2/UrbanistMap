@@ -1,4 +1,5 @@
 import { City, CachedPhotos, Photo } from '@/types';
+import { canonicalizeCityDisplayName } from './cityNameUtils';
 
 const CITIES_KEY = 'urbanist-map-cities';
 const PHOTOS_CACHE_KEY = 'urbanist-map-photos-cache';
@@ -15,9 +16,13 @@ export function loadCities(): City[] {
       console.log('No cities found in localStorage');
       return [];
     }
-    const cities = JSON.parse(data);
-    console.log(`Loaded ${cities.length} cities from localStorage`);
-    return cities;
+    const cities = JSON.parse(data) as City[];
+    const sanitizedCities = cities.map(city => ({
+      ...city,
+      name: canonicalizeCityDisplayName(city.name),
+    }));
+    console.log(`Loaded ${sanitizedCities.length} cities from localStorage`);
+    return sanitizedCities;
   } catch (error) {
     console.error('Error loading cities:', error);
     return [];
@@ -31,9 +36,13 @@ export function saveCities(cities: City[]): void {
   }
   
   try {
-    const json = JSON.stringify(cities);
+    const sanitizedCities = cities.map(city => ({
+      ...city,
+      name: canonicalizeCityDisplayName(city.name),
+    }));
+    const json = JSON.stringify(sanitizedCities);
     localStorage.setItem(CITIES_KEY, json);
-    console.log(`Saved ${cities.length} cities to localStorage`);
+    console.log(`Saved ${sanitizedCities.length} cities to localStorage`);
   } catch (error) {
     console.error('Error saving cities:', error);
     // Check if it's a quota exceeded error
@@ -98,4 +107,3 @@ export function saveCachedPhotos(cityName: string, photos: Photo[]): void {
     console.error('Error saving cached photos:', error);
   }
 }
-

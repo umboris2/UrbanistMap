@@ -10,6 +10,9 @@ import LocationFilters from '@/components/LocationFilters';
 import { City, Photo, Location } from '@/types';
 import { loadCities, saveCities } from '@/lib/storage';
 import { loadLocationsForCity } from '@/lib/locations';
+import { loadPreloadCities } from '@/lib/preloadCities';
+import { getCitiesWithLocations } from '@/lib/cityLocations';
+import { normalizeCityName } from '@/lib/cityNameUtils';
 
 export default function Home() {
   const [selectedCity, setSelectedCity] = useState<City | null>(null);
@@ -21,6 +24,7 @@ export default function Home() {
   const [locationsLoading, setLocationsLoading] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [citiesWithLocations, setCitiesWithLocations] = useState<Set<string>>(new Set());
   
   // Mobile panel states - start with only sidebar open
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -58,32 +62,64 @@ export default function Home() {
 
   useEffect(() => {
     // Load cities on mount
-    const loadedCities = loadCities();
-    setCities(loadedCities);
-    console.log('App initialized, loaded cities:', loadedCities.length);
-    
-    // Test localStorage is working
-    try {
-      const testKey = 'urbanist-map-test';
-      localStorage.setItem(testKey, 'test');
-      const testValue = localStorage.getItem(testKey);
-      localStorage.removeItem(testKey);
-      if (testValue !== 'test') {
-        console.error('localStorage test failed - storage may not be working');
+    const loadInitialCities = async () => {
+      const loadedCities = loadCities();
+      console.log('[page.tsx] App initialized, loaded cities from localStorage:', loadedCities.length);
+      
+      // Only preload from CSV if localStorage is empty (first launch)
+      if (loadedCities.length === 0) {
+        console.log('[page.tsx] No cities in localStorage, loading from City Preload.csv...');
+        try {
+          const preloadCities = await loadPreloadCities();
+          if (preloadCities.length > 0) {
+            console.log(`[page.tsx] ✓ Successfully loaded ${preloadCities.length} cities from CSV preload`);
+            setCities(preloadCities);
+            saveCities(preloadCities);
+          } else {
+            console.warn('[page.tsx] ⚠ No cities were loaded from CSV preload. Check console for errors.');
+            setCities([]);
+          }
+        } catch (error) {
+          console.error('[page.tsx] Error during preload:', error);
+          setCities([]);
+        }
       } else {
-        console.log('localStorage is working correctly');
+        // User already has cities, just use what's in localStorage
+        console.log(`[page.tsx] Found ${loadedCities.length} cities in localStorage, skipping CSV preload`);
+        setCities(loadedCities);
       }
-    } catch (error) {
-      console.error('localStorage is not available:', error);
-    }
+      
+      // Load which cities have locations
+      const citiesWithLocs = await getCitiesWithLocations();
+      setCitiesWithLocations(citiesWithLocs);
+
+      // Test localStorage is working
+      try {
+        const testKey = 'urbanist-map-test';
+        localStorage.setItem(testKey, 'test');
+        const testValue = localStorage.getItem(testKey);
+        localStorage.removeItem(testKey);
+        if (testValue !== 'test') {
+          console.error('localStorage test failed - storage may not be working');
+        } else {
+          console.log('localStorage is working correctly');
+        }
+      } catch (error) {
+        console.error('localStorage is not available:', error);
+      }
+    };
+    
+    loadInitialCities();
   }, []);
 
   // Load locations when city is selected
   useEffect(() => {
     if (selectedCity) {
+      console.log(`[page.tsx] Loading locations for city: "${selectedCity.name}" (id: ${selectedCity.id})`);
       setLocationsLoading(true);
       loadLocationsForCity(selectedCity.name)
         .then(loadedLocations => {
+          console.log(`[page.tsx] Loaded ${loadedLocations.length} locations for "${selectedCity.name}"`);
           setLocations(loadedLocations);
           setLocationsLoading(false);
           // Default: no categories selected (shows all)
@@ -91,10 +127,16 @@ export default function Home() {
           // Open location filters if locations exist
           if (loadedLocations.length > 0) {
             setLocationFiltersOpen(true);
+            // Mark this city as having locations so markers render solid
+            setCitiesWithLocations(prev => {
+              const next = new Set(prev);
+              next.add(normalizeCityName(selectedCity.name));
+              return next;
+            });
           }
         })
         .catch(error => {
-          console.error('Error loading locations:', error);
+          console.error('[page.tsx] Error loading locations:', error);
           setLocations([]);
           setLocationsLoading(false);
         });
@@ -162,6 +204,7 @@ export default function Home() {
         photoSearchQuery={photoSearchQuery}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
+        citiesWithLocations={citiesWithLocations}
       />
       <div 
         style={{ 
@@ -194,6 +237,7 @@ export default function Home() {
           onCitySelect={setSelectedCity}
           locations={filteredLocations}
           onLocationSelect={handleLocationSelect}
+          citiesWithLocations={citiesWithLocations}
         />
         <CityInfo 
           city={selectedCity} 
@@ -244,4 +288,3 @@ export default function Home() {
     </div>
   );
 }
-

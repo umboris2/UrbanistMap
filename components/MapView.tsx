@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { City, Category, Location } from '@/types';
+import { normalizeCityName } from '@/lib/cityNameUtils';
 
 interface MapViewProps {
   cities: City[];
@@ -11,15 +12,18 @@ interface MapViewProps {
   onCitySelect: (city: City) => void;
   locations: Location[];
   onLocationSelect: (location: Location) => void;
+  citiesWithLocations: Set<string>;
 }
 
 const categoryColors: Record<Category, string> = {
   'Tier 1': '#FF6B6B',
   'Tier 2': '#4ECDC4',
   'Tier 3': '#FFE66D',
+  'Tier 4': '#95E1D3',
 };
 
-export default function MapView({ cities, selectedCity, onCitySelect, locations, onLocationSelect }: MapViewProps) {
+
+export default function MapView({ cities, selectedCity, onCitySelect, locations, onLocationSelect, citiesWithLocations }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
@@ -110,9 +114,21 @@ export default function MapView({ cities, selectedCity, onCitySelect, locations,
 
     // Add new city markers
     cities.forEach(city => {
-      const marker = new mapboxgl.Marker({
-        color: categoryColors[city.category],
-      })
+      const normalizedCityName = normalizeCityName(city.name);
+      const hasLocations = citiesWithLocations.has(normalizedCityName);
+      const color = categoryColors[city.category];
+      
+      // Create custom marker element - solid if has locations, hollow if not
+      const el = document.createElement('div');
+      el.style.width = '20px';
+      el.style.height = '20px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = hasLocations ? color : 'transparent';
+      el.style.border = `3px solid ${color}`;
+      el.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
+      el.style.cursor = 'pointer';
+      
+      const marker = new mapboxgl.Marker(el)
         .setLngLat([city.lng, city.lat])
         .addTo(map.current!);
 
@@ -122,7 +138,7 @@ export default function MapView({ cities, selectedCity, onCitySelect, locations,
 
       markers.current.push(marker);
     });
-  }, [cities, onCitySelect]);
+  }, [cities, citiesWithLocations, onCitySelect]);
 
   // Update location markers when locations change
   useEffect(() => {

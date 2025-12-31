@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { City, Category, Photo } from '@/types';
 import { saveCities, loadCachedPhotos, saveCachedPhotos } from '@/lib/storage';
-import { searchCities, extractCountry } from '@/lib/mapbox';
-import { fetchCitySkyline } from '@/lib/wikimedia';
+import { searchCities, extractCountry, getEnglishPlaceName } from '@/lib/mapbox';
 import { fetchPexelsPhotos } from '@/lib/pexels';
+import { normalizeCityName, canonicalizeCityDisplayName } from '@/lib/cityNameUtils';
 
 interface SidebarProps {
   onCitySelect: (city: City) => void;
@@ -18,9 +18,11 @@ interface SidebarProps {
   photoSearchQuery: string;
   isOpen: boolean;
   onToggle: () => void;
+  citiesWithLocations: Set<string>;
 }
 
-export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesChange, onPhotosChange, onPhotosLoadingChange, onPhotoSearchChange, photoSearchQuery, isOpen, onToggle }: SidebarProps) {
+
+export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesChange, onPhotosChange, onPhotosLoadingChange, onPhotoSearchChange, photoSearchQuery, isOpen, onToggle, citiesWithLocations }: SidebarProps) {
   const [filter, setFilter] = useState<Category | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -28,7 +30,6 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
   const [selectedCategory, setSelectedCategory] = useState<Category>('Tier 3');
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [photosLoading, setPhotosLoading] = useState(false);
-  const [cityPhotos, setCityPhotos] = useState<Record<string, Photo | null>>({});
   const [isDesktop, setIsDesktop] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
@@ -43,41 +44,7 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
     return () => window.removeEventListener('resize', checkDesktop);
   }, []);
 
-  // Load skyline photos for all cities (for thumbnails in city bars)
-  useEffect(() => {
-    const loadCityThumbnails = async () => {
-      const photosMap: Record<string, Photo | null> = {};
-      
-      for (const city of cities) {
-        // Try to get thumbnail from cache first
-        const cached = loadCachedPhotos(city.name);
-        // Use first cached photo if available
-        if (cached && cached.length > 0) {
-          photosMap[city.id] = cached[0];
-        } else {
-          // Fetch first relevant photo from Wikimedia Commons
-          try {
-            const thumbnail = await fetchCitySkyline(city.name);
-            if (thumbnail) {
-              photosMap[city.id] = thumbnail;
-              // Cache it
-              saveCachedPhotos(city.name, [thumbnail]);
-            } else {
-              photosMap[city.id] = null;
-            }
-          } catch (error) {
-            photosMap[city.id] = null;
-          }
-        }
-      }
-      
-      setCityPhotos(photosMap);
-    };
-
-    if (cities.length > 0) {
-      loadCityThumbnails();
-    }
-  }, [cities]);
+  // Removed city thumbnail loading to improve performance
 
   // Load photos for selected city (for photo strip in map area)
   useEffect(() => {
@@ -171,11 +138,16 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
     if (!selectedSearchResult) return;
 
     const country = extractCountry(selectedSearchResult.context);
+    const englishName = getEnglishPlaceName(
+      selectedSearchResult, 
+      selectedSearchResult.text || selectedSearchResult.place_name.split(',')[0]
+    );
+    const displayName = canonicalizeCityDisplayName(englishName);
     const [lng, lat] = selectedSearchResult.center;
 
     const newCity: City = {
       id: `${Date.now()}-${Math.random()}`,
-      name: selectedSearchResult.place_name.split(',')[0], // Get city name (first part)
+      name: displayName, // Prefer English display name for consistency with location data
       country,
       lat,
       lng,
@@ -209,6 +181,7 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
     'Tier 1': '#FF6B6B',
     'Tier 2': '#4ECDC4',
     'Tier 3': '#FFE66D',
+    'Tier 4': '#95E1D3',
   };
 
   return (
@@ -390,6 +363,7 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
           <option value="Tier 1">Tier 1</option>
           <option value="Tier 2">Tier 2</option>
           <option value="Tier 3">Tier 3</option>
+          <option value="Tier 4">Tier 4</option>
         </select>
 
         <button
@@ -443,6 +417,7 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
           <option value="Tier 1">Tier 1</option>
           <option value="Tier 2">Tier 2</option>
           <option value="Tier 3">Tier 3</option>
+          <option value="Tier 4">Tier 4</option>
         </select>
       </div>
 
@@ -456,7 +431,7 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
             No cities yet. Add one above!
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {filteredCities.map((city) => (
               <div
                 key={city.id}
@@ -468,9 +443,9 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
                   backgroundColor: selectedCity?.id === city.id ? '#f0f7ff' : '#fff',
                   transition: 'background-color 0.2s',
                   display: 'flex',
-                  gap: '8px',
+                  gap: '6px',
                   alignItems: 'center',
-                  padding: '8px 12px',
+                  padding: '6px 10px',
                   boxSizing: 'border-box',
                 }}
                 onMouseEnter={(e) => {
@@ -484,60 +459,35 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
                   }
                 }}
               >
-                {/* Photo thumbnail */}
-                <div
-                  style={{
-                    width: '60px',
-                    height: '60px',
-                    borderRadius: '4px',
-                    overflow: 'hidden',
-                    flexShrink: 0,
-                    backgroundColor: '#f0f0f0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {cityPhotos[city.id] ? (
-                    <img
-                      src={cityPhotos[city.id]!.imageUrl}
-                      alt={city.name}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                      }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  ) : (
-                    <div style={{ fontSize: '20px', color: '#ccc' }}>📍</div>
-                  )}
-                </div>
-
                 {/* City info */}
-                <div style={{ flex: 1, minWidth: 0, marginRight: '8px' }}>
-                  <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ flex: 1, minWidth: 0, marginRight: '4px' }}>
+                  <div style={{ fontWeight: 600, fontSize: '12px', marginBottom: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {city.name}
                   </div>
-                  {city.country && (
-                    <div style={{ fontSize: '11px', color: '#666', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {city.country}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {city.country && (
+                      <div style={{ fontSize: '10px', color: '#666', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {city.country}
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        display: 'inline-block',
+                        padding: '1px 5px',
+                        borderRadius: '8px',
+                        fontSize: '9px',
+                        fontWeight: 500,
+                        backgroundColor: citiesWithLocations.has(normalizeCityName(city.name)) 
+                          ? categoryColors[city.category] 
+                          : 'transparent',
+                        border: `1px solid ${categoryColors[city.category]}`,
+                        color: citiesWithLocations.has(normalizeCityName(city.name)) 
+                          ? '#000' 
+                          : categoryColors[city.category],
+                      }}
+                    >
+                      {city.category}
                     </div>
-                  )}
-                  <div
-                    style={{
-                      display: 'inline-block',
-                      padding: '2px 6px',
-                      borderRadius: '10px',
-                      fontSize: '10px',
-                      fontWeight: 500,
-                      backgroundColor: categoryColors[city.category],
-                      color: '#000',
-                    }}
-                  >
-                    {city.category}
                   </div>
                 </div>
 
@@ -578,4 +528,3 @@ export default function Sidebar({ onCitySelect, selectedCity, cities, onCitiesCh
     </>
   );
 }
-

@@ -39,6 +39,24 @@ export default function CityInfo({ city, isOpen, onToggle }: CityInfoProps) {
   if (!city) return null;
 
   const wikipediaUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(city.name)}${city.country ? `,_${city.country.replace(/\s+/g, '_')}` : ''}`;
+  const citySearchQuery = `${city.name}${city.country ? ` ${city.country}` : ''}`;
+  const airbnbUrl = `https://www.airbnb.com/s/${encodeURIComponent(citySearchQuery)}/homes`;
+  const googleMapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(citySearchQuery)}`;
+
+  const iconButtonStyle = {
+    width: '44px',
+    height: '44px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f5f5f5',
+    borderRadius: '8px',
+    textDecoration: 'none',
+    fontSize: '24px',
+    transition: 'all 0.2s',
+    border: 'none',
+    cursor: 'pointer',
+  };
 
   return (
     <div
@@ -99,35 +117,58 @@ export default function CityInfo({ city, isOpen, onToggle }: CityInfoProps) {
         </p>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        {/* Icon Links Row */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <a
             href={wikipediaUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              flex: 1,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              padding: '8px 12px',
-              backgroundColor: '#f5f5f5',
-              borderRadius: '4px',
-              textDecoration: 'none',
-              color: '#333',
-              fontSize: '14px',
-              transition: 'background-color 0.2s',
-            }}
+            style={iconButtonStyle}
+            title="Wikipedia"
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#e0e0e0';
+              e.currentTarget.style.transform = 'scale(1.1)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = '#f5f5f5';
+              e.currentTarget.style.transform = 'scale(1)';
             }}
           >
-            <span>📖</span>
-            <span>Wikipedia</span>
-            <span style={{ marginLeft: 'auto' }}>↗</span>
+            📖
+          </a>
+          <a
+            href={airbnbUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={iconButtonStyle}
+            title="Airbnb"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#e0e0e0';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#f5f5f5';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            🏠
+          </a>
+          <a
+            href={googleMapsUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={iconButtonStyle}
+            title="Google Maps"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#e0e0e0';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#f5f5f5';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            🗺️
           </a>
           
           {/* Weather Box */}
@@ -139,7 +180,7 @@ export default function CityInfo({ city, isOpen, onToggle }: CityInfoProps) {
               gap: '8px',
               padding: '8px 12px',
               backgroundColor: '#e3f2fd',
-              borderRadius: '4px',
+              borderRadius: '8px',
               fontSize: '14px',
               minWidth: '100px',
             }}
