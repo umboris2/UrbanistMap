@@ -80,6 +80,11 @@ export function normalizeCityName(name: string): string {
     .replace(/[\u0300-\u036f]/g, '') // Remove combining diacritical marks
     .trim();
   
+  // Normalize common abbreviations before other processing
+  // "st." or "st " at word boundaries → "saint"
+  normalized = normalized.replace(/\bst\.\s*/g, 'saint ');
+  normalized = normalized.replace(/\bst\s+/g, 'saint ');
+  
   // Remove common administrative/district suffixes that Mapbox might add
   // Pattern: "City Name - Suffix" or "City Name-Suffix"
   const suffixPatterns = [

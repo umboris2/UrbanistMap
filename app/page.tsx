@@ -117,7 +117,8 @@ export default function Home() {
     if (selectedCity) {
       console.log(`[page.tsx] Loading locations for city: "${selectedCity.name}" (id: ${selectedCity.id})`);
       setLocationsLoading(true);
-      loadLocationsForCity(selectedCity.name)
+      // Pass city coordinates to bias geocoding results toward the correct city
+      loadLocationsForCity(selectedCity.name, [selectedCity.lng, selectedCity.lat])
         .then(loadedLocations => {
           console.log(`[page.tsx] Loaded ${loadedLocations.length} locations for "${selectedCity.name}"`);
           setLocations(loadedLocations);

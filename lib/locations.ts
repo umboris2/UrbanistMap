@@ -6,8 +6,13 @@ import { normalizeCityName, cityNamesMatch } from './cityNameUtils';
 /**
  * Parse CSV file and load locations for a specific city
  * CSV format: city,country,category,name,address,why_it_matters,associated_person_or_event,source_url
+ * @param cityName - The name of the city
+ * @param cityCoordinates - Optional [lng, lat] coordinates of the city center to bias geocoding results
  */
-export async function loadLocationsForCity(cityName: string): Promise<Location[]> {
+export async function loadLocationsForCity(
+  cityName: string,
+  cityCoordinates?: [number, number] // [lng, lat]
+): Promise<Location[]> {
   try {
     console.log(`[loadLocationsForCity] Starting load for city: "${cityName}"`);
     
@@ -172,12 +177,16 @@ export async function loadLocationsForCity(cityName: string): Promise<Location[]
       }
 
       try {
-        const result = await geocodeAddress(loc.address, token);
+        // Include city name in geocoding query and use proximity bias to ensure results are near the city
+        // This prevents addresses from being geocoded to wrong cities (e.g., "Red Square" in Moscow vs other cities)
+        const result = await geocodeAddress(loc.address, token, loc.cityName, cityCoordinates);
         if (!result) {
+          console.warn(`[loadLocationsForCity] Failed to geocode: "${loc.address}" in ${loc.cityName}`);
           return null;
         }
 
         const [lng, lat] = result.center;
+        console.log(`[loadLocationsForCity] ✓ Geocoded "${loc.name}": ${lat}, ${lng}`);
         
         // Save to cache
         geocodeCache[cacheKey] = { lat, lng };
@@ -281,4 +290,3 @@ export async function fetchLocationPhoto(location: Location): Promise<string | n
     return null;
   }
 }
-

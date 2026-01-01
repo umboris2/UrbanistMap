@@ -69,19 +69,35 @@ export function getEnglishPlaceName(result: GeocodingResult, fallback?: string):
 /**
  * Geocode an address to get coordinates
  * This is for specific addresses, not city searches
+ * @param address - The address to geocode
+ * @param token - Mapbox API token
+ * @param cityName - Optional city name to include in the query for better accuracy
+ * @param proximity - Optional [lng, lat] to bias geocoding results toward a specific location
  */
 export async function geocodeAddress(
   address: string,
-  token: string
+  token: string,
+  cityName?: string,
+  proximity?: [number, number] // [lng, lat]
 ): Promise<GeocodingResult | null> {
   if (!address.trim() || !token) return null;
   
   try {
-    // Use geocoding API without type restrictions to get precise addresses
-    // Request English language for names
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
-      address
+    // Include city name in query if provided to improve accuracy
+    // This prevents addresses like "Nevsky Prospect" from matching locations worldwide
+    const query = cityName 
+      ? `${address}, ${cityName}`
+      : address;
+    
+    // Build URL with proximity parameter if provided
+    // Proximity biases results toward the specified coordinates (format: lng,lat)
+    let url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+      query
     )}.json?access_token=${token}&limit=1&language=en`;
+    
+    if (proximity) {
+      url += `&proximity=${proximity[0]},${proximity[1]}`;
+    }
     
     const response = await fetch(url);
     if (!response.ok) throw new Error('Geocoding request failed');
