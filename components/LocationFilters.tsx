@@ -61,21 +61,20 @@ export default function LocationFilters({ locations, selectedCategories, onCateg
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(10px)',
           borderRadius: '8px',
-          padding: '12px',
+          padding: '10px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
           zIndex: 1000,
           maxWidth: '250px',
           width: '250px',
           transition: 'right 0.3s ease',
           boxSizing: 'border-box',
-          // Ensure it doesn't affect parent layout
           pointerEvents: isOpen ? 'auto' : 'none',
         }}
       >
       <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: '#666' }}>
         Filter Locations
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {categories.map(category => {
           const isChecked = selectedCategories.has(category);
           const count = locations.filter(loc => loc.category === category).length;
@@ -86,9 +85,9 @@ export default function LocationFilters({ locations, selectedCategories, onCateg
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: '6px',
                 cursor: 'pointer',
-                fontSize: '13px',
+                fontSize: '12px',
                 userSelect: 'none',
               }}
             >
@@ -97,8 +96,8 @@ export default function LocationFilters({ locations, selectedCategories, onCateg
                 checked={isChecked}
                 onChange={() => onCategoryToggle(category)}
                 style={{
-                  width: '16px',
-                  height: '16px',
+                  width: '14px',
+                  height: '14px',
                   cursor: 'pointer',
                 }}
               />

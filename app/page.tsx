@@ -7,6 +7,7 @@ import CityInfo from '@/components/CityInfo';
 import PhotoStrip from '@/components/PhotoStrip';
 import LocationPopup from '@/components/LocationPopup';
 import LocationFilters from '@/components/LocationFilters';
+import LocationList from '@/components/LocationList';
 import { City, Photo, Location } from '@/types';
 import { loadCities, saveCities } from '@/lib/storage';
 import { loadLocationsForCity } from '@/lib/locations';
@@ -30,6 +31,7 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [photoStripOpen, setPhotoStripOpen] = useState(false);
   const [locationFiltersOpen, setLocationFiltersOpen] = useState(false);
+  const [locationListOpen, setLocationListOpen] = useState(false);
   const [cityInfoOpen, setCityInfoOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -57,6 +59,7 @@ export default function Home() {
       setCityInfoOpen(false);
       setPhotoStripOpen(false);
       setLocationFiltersOpen(false);
+      setLocationListOpen(false);
     }
   }, [selectedCity?.id]); // Only trigger when city ID changes
 
@@ -125,9 +128,10 @@ export default function Home() {
           setLocationsLoading(false);
           // Default: no categories selected (shows all)
           setSelectedCategories(new Set());
-          // Open location filters if locations exist
+          // Open location filters and list if locations exist
           if (loadedLocations.length > 0) {
             setLocationFiltersOpen(true);
+            setLocationListOpen(true);
             // Mark this city as having locations so markers render solid
             setCitiesWithLocations(prev => {
               const next = new Set(prev);
@@ -159,6 +163,7 @@ export default function Home() {
 
   const handleLocationSelect = (location: Location) => {
     setSelectedLocation(location);
+    // MapView will handle flying to the location via selectedLocation prop
   };
 
   const handleCategoryToggle = (category: string) => {
@@ -239,6 +244,7 @@ export default function Home() {
           locations={filteredLocations}
           onLocationSelect={handleLocationSelect}
           citiesWithLocations={citiesWithLocations}
+          selectedLocation={selectedLocation}
         />
         <CityInfo 
           city={selectedCity} 
@@ -246,13 +252,22 @@ export default function Home() {
           onToggle={() => setCityInfoOpen(!cityInfoOpen)}
         />
         {selectedCity && locations.length > 0 && (
-          <LocationFilters
-            locations={locations}
-            selectedCategories={selectedCategories}
-            onCategoryToggle={handleCategoryToggle}
-            isOpen={locationFiltersOpen}
-            onToggle={() => setLocationFiltersOpen(!locationFiltersOpen)}
-          />
+          <>
+            <LocationFilters
+              locations={locations}
+              selectedCategories={selectedCategories}
+              onCategoryToggle={handleCategoryToggle}
+              isOpen={locationFiltersOpen}
+              onToggle={() => setLocationFiltersOpen(!locationFiltersOpen)}
+            />
+            <LocationList
+              locations={locations}
+              selectedCategories={selectedCategories}
+              onLocationSelect={handleLocationSelect}
+              isOpen={locationListOpen}
+              onToggle={() => setLocationListOpen(!locationListOpen)}
+            />
+          </>
         )}
         {selectedCity && (
           <PhotoStrip 

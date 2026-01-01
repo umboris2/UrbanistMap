@@ -13,6 +13,7 @@ interface MapViewProps {
   locations: Location[];
   onLocationSelect: (location: Location) => void;
   citiesWithLocations: Set<string>;
+  selectedLocation: Location | null;
 }
 
 const categoryColors: Record<Category, string> = {
@@ -23,7 +24,7 @@ const categoryColors: Record<Category, string> = {
 };
 
 
-export default function MapView({ cities, selectedCity, onCitySelect, locations, onLocationSelect, citiesWithLocations }: MapViewProps) {
+export default function MapView({ cities, selectedCity, onCitySelect, locations, onLocationSelect, citiesWithLocations, selectedLocation }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markers = useRef<mapboxgl.Marker[]>([]);
@@ -185,6 +186,17 @@ export default function MapView({ cities, selectedCity, onCitySelect, locations,
       duration: 1500,
     });
   }, [selectedCity]);
+
+  // Fly to selected location
+  useEffect(() => {
+    if (!map.current || !selectedLocation) return;
+
+    map.current.flyTo({
+      center: [selectedLocation.lng, selectedLocation.lat],
+      zoom: 15,
+      duration: 1500,
+    });
+  }, [selectedLocation]);
 
   return (
     <div
