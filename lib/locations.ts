@@ -213,8 +213,8 @@ export async function loadLocationsForCity(
       }
 
       try {
-        let lat: number;
-        let lng: number;
+        let lat: number | undefined;
+        let lng: number | undefined;
         let usedService = 'unknown';
         let needsGoogleFallback = false;
 
@@ -281,6 +281,12 @@ export async function loadLocationsForCity(
         } else if (needsGoogleFallback && !googleApiKey) {
           // Both failed or no Google key available
           console.error(`[loadLocationsForCity] ❌ No geocoding service available for: "${loc.address}"`);
+          return null;
+        }
+
+        // Ensure we have valid coordinates before proceeding
+        if (lat === undefined || lng === undefined) {
+          console.error(`[loadLocationsForCity] ❌ No valid coordinates obtained for: "${loc.address}"`);
           return null;
         }
 
