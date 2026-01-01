@@ -1,5 +1,6 @@
 import { Location } from '@/types';
 import { geocodeAddress } from './mapbox';
+import { geocodeAddressGoogle } from './googleMaps';
 import { fetchCitySkyline } from './wikimedia';
 import { normalizeCityName, cityNamesMatch } from './cityNameUtils';
 
@@ -157,7 +158,20 @@ export async function loadLocationsForCity(
       }
     }
 
-    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    // Prefer Google Maps API for better accuracy, fallback to Mapbox
+    const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    const useGoogleMaps = !!googleApiKey;
+
+    // Log which service we're using (helpful for debugging)
+    console.log(`[loadLocationsForCity] Geocoding service: ${useGoogleMaps ? 'Google Maps' : 'Mapbox'}`);
+    if (useGoogleMaps) {
+      console.log('[loadLocationsForCity] Google Maps API key detected ✓');
+    } else if (mapboxToken) {
+      console.log('[loadLocationsForCity] Using Mapbox (Google Maps API key not found)');
+    } else {
+      console.error('[loadLocationsForCity] No geocoding API key found. Please set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY or NEXT_PUBLIC_MAPBOX_TOKEN');
+    }
 
     // Geocode all addresses in parallel (with caching)
     const geocodePromises = locationsToGeocode.map(async (loc) => {
@@ -172,21 +186,35 @@ export async function loadLocationsForCity(
       }
 
       // Geocode if not cached
-      if (!token) {
+      if (!googleApiKey && !mapboxToken) {
         return null;
       }
 
       try {
-        // Include city name in geocoding query and use proximity bias to ensure results are near the city
-        // This prevents addresses from being geocoded to wrong cities (e.g., "Red Square" in Moscow vs other cities)
-        const result = await geocodeAddress(loc.address, token, loc.cityName, cityCoordinates);
-        if (!result) {
-          console.warn(`[loadLocationsForCity] Failed to geocode: "${loc.address}" in ${loc.cityName}`);
-          return null;
+        let lat: number;
+        let lng: number;
+
+        if (useGoogleMaps) {
+          // Use Google Maps Geocoding API (better accuracy for addresses)
+          // Google Maps doesn't need explicit location biasing - city name in query is sufficient
+          const result = await geocodeAddressGoogle(loc.address, googleApiKey!, loc.cityName);
+          if (!result) {
+            console.warn(`[loadLocationsForCity] Failed to geocode with Google: "${loc.address}" in ${loc.cityName}`);
+            return null;
+          }
+          lat = result.lat;
+          lng = result.lng;
+        } else {
+          // Fallback to Mapbox (with location biasing)
+          const result = await geocodeAddress(loc.address, mapboxToken!, loc.cityName, cityCoordinates);
+          if (!result) {
+            console.warn(`[loadLocationsForCity] Failed to geocode with Mapbox: "${loc.address}" in ${loc.cityName}`);
+            return null;
+          }
+          [lng, lat] = result.center;
         }
 
-        const [lng, lat] = result.center;
-        console.log(`[loadLocationsForCity] ✓ Geocoded "${loc.name}": ${lat}, ${lng}`);
+        console.log(`[loadLocationsForCity] ✓ Geocoded "${loc.name}": ${lat}, ${lng} (using ${useGoogleMaps ? 'Google Maps' : 'Mapbox'})`);
         
         // Save to cache
         geocodeCache[cacheKey] = { lat, lng };
