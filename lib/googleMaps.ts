@@ -59,6 +59,19 @@ export async function geocodeAddressGoogle(
         error_message: data.error_message || 'Unknown error',
         full_response: data
       });
+      
+      // Provide helpful error messages for common issues
+      if (data.status === 'REQUEST_DENIED') {
+        console.error(`[geocodeAddressGoogle] 🔒 REQUEST_DENIED - Check:`);
+        console.error(`  1. API key restrictions in Google Cloud Console`);
+        console.error(`  2. HTTP referrers must include: https://*.vercel.app/*`);
+        console.error(`  3. Geocoding API must be enabled`);
+        console.error(`  4. Billing must be enabled (required even for free tier)`);
+        if (data.error_message) {
+          console.error(`  Error details: ${data.error_message}`);
+        }
+      }
+      
       return null;
     }
     

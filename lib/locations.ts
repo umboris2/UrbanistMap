@@ -179,17 +179,17 @@ export async function loadLocationsForCity(
       }
     }
 
-    // Use Mapbox first (free), fallback to Google Maps if Mapbox fails or result is too far
+    // Use Mapbox first (free), but be more aggressive about falling back to Google Maps
     const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
     const MAX_DISTANCE_KM = 30; // Maximum distance from city center to consider result valid
 
-    console.log('[loadLocationsForCity] Geocoding strategy: Mapbox first, Google Maps as fallback');
+    console.log('[loadLocationsForCity] Geocoding strategy: Mapbox first, Google Maps fallback (aggressive validation)');
     if (!mapboxToken) {
-      console.error('[loadLocationsForCity] ❌ Mapbox token not found - required for primary geocoding');
+      console.warn('[loadLocationsForCity] ⚠ Mapbox token not found - will use Google Maps only');
     }
     if (!googleApiKey) {
-      console.warn('[loadLocationsForCity] ⚠ Google Maps API key not found - no fallback available');
+      console.error('[loadLocationsForCity] ❌ Google Maps API key not found - no fallback available');
     }
 
     // Geocode all addresses in parallel (with caching)
@@ -218,15 +218,20 @@ export async function loadLocationsForCity(
         let usedService = 'unknown';
         let needsGoogleFallback = false;
 
-        // Try Mapbox first (free)
+        // Try Mapbox first (free) - but validate more strictly
         if (mapboxToken) {
           console.log(`[loadLocationsForCity] Trying Mapbox first for: "${loc.address}" in ${loc.cityName}`);
           const mapboxResult = await geocodeAddress(loc.address, mapboxToken, loc.cityName, cityCoordinates);
           
           if (mapboxResult) {
             const [resultLng, resultLat] = mapboxResult.center;
+            const placeName = mapboxResult.place_name || '';
             
-            // Check if result is near the city center (if we have city coordinates)
+            // Strict validation: Check multiple factors
+            let isValid = true;
+            let validationReasons: string[] = [];
+            
+            // 1. Distance check (if we have city coordinates)
             if (cityCoordinates) {
               const distance = calculateDistance(
                 resultLat,
@@ -235,28 +240,55 @@ export async function loadLocationsForCity(
                 cityCoordinates[0]
               );
               
-              console.log(`[loadLocationsForCity] Mapbox result distance from city center: ${distance.toFixed(2)} km`);
+              console.log(`[loadLocationsForCity] Mapbox result distance: ${distance.toFixed(2)} km`);
               
               if (distance > MAX_DISTANCE_KM) {
-                console.warn(`[loadLocationsForCity] ⚠ Mapbox result too far (${distance.toFixed(2)} km), trying Google Maps fallback`);
-                needsGoogleFallback = true;
-              } else {
-                // Mapbox result is good!
-                lat = resultLat;
-                lng = resultLng;
-                usedService = 'Mapbox';
-                console.log(`[loadLocationsForCity] ✓ Mapbox geocoded "${loc.name}": ${lat}, ${lng} (${distance.toFixed(2)} km from city)`);
+                isValid = false;
+                validationReasons.push(`too far (${distance.toFixed(2)} km)`);
               }
-            } else {
-              // No city coordinates to check against, use Mapbox result
+            }
+            
+            // 2. Relevance check - check if place_name contains address keywords
+            const addressLower = loc.address.toLowerCase();
+            const placeNameLower = placeName.toLowerCase();
+            const addressWords = addressLower.split(/[\s,]+/).filter(w => w.length > 2); // Words longer than 2 chars
+            const matchingWords = addressWords.filter(word => placeNameLower.includes(word));
+            const relevanceScore = addressWords.length > 0 ? matchingWords.length / addressWords.length : 0;
+            
+            console.log(`[loadLocationsForCity] Mapbox relevance: ${(relevanceScore * 100).toFixed(0)}% (${matchingWords.length}/${addressWords.length} words)`);
+            
+            // Require at least 40% relevance (more strict than before)
+            if (relevanceScore < 0.4 && addressWords.length > 0) {
+              isValid = false;
+              validationReasons.push(`low relevance (${(relevanceScore * 100).toFixed(0)}%)`);
+            }
+            
+            // 3. Check if result seems like a generic location (e.g., just city name)
+            // If place_name is mostly just the city, it's probably not specific enough
+            const cityNameLower = (loc.cityName || '').toLowerCase();
+            if (placeNameLower.split(',').length <= 2 && placeNameLower.includes(cityNameLower)) {
+              // Result is too generic (just city or city + country)
+              isValid = false;
+              validationReasons.push('too generic (just city name)');
+            }
+            
+            if (isValid) {
+              // Mapbox result passed all checks!
               lat = resultLat;
               lng = resultLng;
               usedService = 'Mapbox';
-              console.log(`[loadLocationsForCity] ✓ Mapbox geocoded "${loc.name}": ${lat}, ${lng} (no city coordinates to verify)`);
+              const distanceStr = cityCoordinates 
+                ? ` (${calculateDistance(resultLat, resultLng, cityCoordinates[1], cityCoordinates[0]).toFixed(2)} km from city)`
+                : '';
+              console.log(`[loadLocationsForCity] ✓ Mapbox geocoded "${loc.name}": ${lat}, ${lng}${distanceStr}`);
+            } else {
+              // Mapbox result failed validation
+              console.warn(`[loadLocationsForCity] ⚠ Mapbox result failed validation: ${validationReasons.join(', ')}. Trying Google Maps fallback`);
+              needsGoogleFallback = true;
             }
           } else {
-            // Mapbox failed, try Google fallback
-            console.warn(`[loadLocationsForCity] ⚠ Mapbox failed for "${loc.address}", trying Google Maps fallback`);
+            // Mapbox failed to find result
+            console.warn(`[loadLocationsForCity] ⚠ Mapbox returned no results for "${loc.address}", trying Google Maps fallback`);
             needsGoogleFallback = true;
           }
         } else {
