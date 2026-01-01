@@ -163,14 +163,22 @@ export async function loadLocationsForCity(
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
     const useGoogleMaps = !!googleApiKey;
 
-    // Log which service we're using (helpful for debugging)
-    console.log(`[loadLocationsForCity] Geocoding service: ${useGoogleMaps ? 'Google Maps' : 'Mapbox'}`);
+    // Detailed logging for debugging
+    console.log('[loadLocationsForCity] ========== DEBUG INFO ==========');
+    console.log('[loadLocationsForCity] googleApiKey exists:', !!googleApiKey);
+    console.log('[loadLocationsForCity] googleApiKey length:', googleApiKey?.length || 0);
+    console.log('[loadLocationsForCity] googleApiKey starts with:', googleApiKey?.substring(0, 10) || 'N/A');
+    console.log('[loadLocationsForCity] mapboxToken exists:', !!mapboxToken);
+    console.log('[loadLocationsForCity] useGoogleMaps:', useGoogleMaps);
+    console.log('[loadLocationsForCity] Geocoding service:', useGoogleMaps ? 'Google Maps' : 'Mapbox');
+    console.log('[loadLocationsForCity] =================================');
+    
     if (useGoogleMaps) {
-      console.log('[loadLocationsForCity] Google Maps API key detected ✓');
+      console.log('[loadLocationsForCity] ✓ Using Google Maps Geocoding API');
     } else if (mapboxToken) {
-      console.log('[loadLocationsForCity] Using Mapbox (Google Maps API key not found)');
+      console.log('[loadLocationsForCity] ⚠ Using Mapbox (Google Maps API key not found or empty)');
     } else {
-      console.error('[loadLocationsForCity] No geocoding API key found. Please set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY or NEXT_PUBLIC_MAPBOX_TOKEN');
+      console.error('[loadLocationsForCity] ❌ No geocoding API key found');
     }
 
     // Geocode all addresses in parallel (with caching)
@@ -178,12 +186,15 @@ export async function loadLocationsForCity(
       // Check cache first
       const cacheKey = `${loc.address}-${loc.cityName}`;
       if (geocodeCache[cacheKey]) {
+        console.log(`[loadLocationsForCity] Using CACHED coordinates for "${loc.name}": ${geocodeCache[cacheKey].lat}, ${geocodeCache[cacheKey].lng}`);
         return {
           ...loc,
           lat: geocodeCache[cacheKey].lat,
           lng: geocodeCache[cacheKey].lng,
         };
       }
+      
+      console.log(`[loadLocationsForCity] No cache found, will geocode: "${loc.name}" at "${loc.address}"`);
 
       // Geocode if not cached
       if (!googleApiKey && !mapboxToken) {
@@ -197,9 +208,11 @@ export async function loadLocationsForCity(
         if (useGoogleMaps) {
           // Use Google Maps Geocoding API (better accuracy for addresses)
           // Google Maps doesn't need explicit location biasing - city name in query is sufficient
+          console.log(`[loadLocationsForCity] Attempting Google geocode for: "${loc.address}" in ${loc.cityName}`);
           const result = await geocodeAddressGoogle(loc.address, googleApiKey!, loc.cityName);
           if (!result) {
-            console.warn(`[loadLocationsForCity] Failed to geocode with Google: "${loc.address}" in ${loc.cityName}`);
+            console.error(`[loadLocationsForCity] ❌ Failed to geocode with Google: "${loc.address}" in ${loc.cityName}`);
+            console.error(`[loadLocationsForCity] Check console above for detailed Google Maps API error messages`);
             return null;
           }
           lat = result.lat;
