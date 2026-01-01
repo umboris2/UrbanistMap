@@ -5,6 +5,27 @@ import { fetchCitySkyline } from './wikimedia';
 import { normalizeCityName, cityNamesMatch } from './cityNameUtils';
 
 /**
+ * Calculate distance between two coordinates using Haversine formula
+ * Returns distance in kilometers
+ */
+function calculateDistance(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
  * Parse CSV file and load locations for a specific city
  * CSV format: city,country,category,name,address,why_it_matters,associated_person_or_event,source_url
  * @param cityName - The name of the city
@@ -158,27 +179,17 @@ export async function loadLocationsForCity(
       }
     }
 
-    // Prefer Google Maps API for better accuracy, fallback to Mapbox
+    // Use Mapbox first (free), fallback to Google Maps if Mapbox fails or result is too far
     const googleApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-    const useGoogleMaps = !!googleApiKey;
+    const MAX_DISTANCE_KM = 30; // Maximum distance from city center to consider result valid
 
-    // Detailed logging for debugging
-    console.log('[loadLocationsForCity] ========== DEBUG INFO ==========');
-    console.log('[loadLocationsForCity] googleApiKey exists:', !!googleApiKey);
-    console.log('[loadLocationsForCity] googleApiKey length:', googleApiKey?.length || 0);
-    console.log('[loadLocationsForCity] googleApiKey starts with:', googleApiKey?.substring(0, 10) || 'N/A');
-    console.log('[loadLocationsForCity] mapboxToken exists:', !!mapboxToken);
-    console.log('[loadLocationsForCity] useGoogleMaps:', useGoogleMaps);
-    console.log('[loadLocationsForCity] Geocoding service:', useGoogleMaps ? 'Google Maps' : 'Mapbox');
-    console.log('[loadLocationsForCity] =================================');
-    
-    if (useGoogleMaps) {
-      console.log('[loadLocationsForCity] ✓ Using Google Maps Geocoding API');
-    } else if (mapboxToken) {
-      console.log('[loadLocationsForCity] ⚠ Using Mapbox (Google Maps API key not found or empty)');
-    } else {
-      console.error('[loadLocationsForCity] ❌ No geocoding API key found');
+    console.log('[loadLocationsForCity] Geocoding strategy: Mapbox first, Google Maps as fallback');
+    if (!mapboxToken) {
+      console.error('[loadLocationsForCity] ❌ Mapbox token not found - required for primary geocoding');
+    }
+    if (!googleApiKey) {
+      console.warn('[loadLocationsForCity] ⚠ Google Maps API key not found - no fallback available');
     }
 
     // Geocode all addresses in parallel (with caching)
@@ -204,30 +215,76 @@ export async function loadLocationsForCity(
       try {
         let lat: number;
         let lng: number;
+        let usedService = 'unknown';
+        let needsGoogleFallback = false;
 
-        if (useGoogleMaps) {
-          // Use Google Maps Geocoding API (better accuracy for addresses)
-          // Google Maps doesn't need explicit location biasing - city name in query is sufficient
-          console.log(`[loadLocationsForCity] Attempting Google geocode for: "${loc.address}" in ${loc.cityName}`);
-          const result = await geocodeAddressGoogle(loc.address, googleApiKey!, loc.cityName);
-          if (!result) {
-            console.error(`[loadLocationsForCity] ❌ Failed to geocode with Google: "${loc.address}" in ${loc.cityName}`);
-            console.error(`[loadLocationsForCity] Check console above for detailed Google Maps API error messages`);
-            return null;
+        // Try Mapbox first (free)
+        if (mapboxToken) {
+          console.log(`[loadLocationsForCity] Trying Mapbox first for: "${loc.address}" in ${loc.cityName}`);
+          const mapboxResult = await geocodeAddress(loc.address, mapboxToken, loc.cityName, cityCoordinates);
+          
+          if (mapboxResult) {
+            const [resultLng, resultLat] = mapboxResult.center;
+            
+            // Check if result is near the city center (if we have city coordinates)
+            if (cityCoordinates) {
+              const distance = calculateDistance(
+                resultLat,
+                resultLng,
+                cityCoordinates[1], // cityCoordinates is [lng, lat]
+                cityCoordinates[0]
+              );
+              
+              console.log(`[loadLocationsForCity] Mapbox result distance from city center: ${distance.toFixed(2)} km`);
+              
+              if (distance > MAX_DISTANCE_KM) {
+                console.warn(`[loadLocationsForCity] ⚠ Mapbox result too far (${distance.toFixed(2)} km), trying Google Maps fallback`);
+                needsGoogleFallback = true;
+              } else {
+                // Mapbox result is good!
+                lat = resultLat;
+                lng = resultLng;
+                usedService = 'Mapbox';
+                console.log(`[loadLocationsForCity] ✓ Mapbox geocoded "${loc.name}": ${lat}, ${lng} (${distance.toFixed(2)} km from city)`);
+              }
+            } else {
+              // No city coordinates to check against, use Mapbox result
+              lat = resultLat;
+              lng = resultLng;
+              usedService = 'Mapbox';
+              console.log(`[loadLocationsForCity] ✓ Mapbox geocoded "${loc.name}": ${lat}, ${lng} (no city coordinates to verify)`);
+            }
+          } else {
+            // Mapbox failed, try Google fallback
+            console.warn(`[loadLocationsForCity] ⚠ Mapbox failed for "${loc.address}", trying Google Maps fallback`);
+            needsGoogleFallback = true;
           }
-          lat = result.lat;
-          lng = result.lng;
         } else {
-          // Fallback to Mapbox (with location biasing)
-          const result = await geocodeAddress(loc.address, mapboxToken!, loc.cityName, cityCoordinates);
-          if (!result) {
-            console.warn(`[loadLocationsForCity] Failed to geocode with Mapbox: "${loc.address}" in ${loc.cityName}`);
-            return null;
-          }
-          [lng, lat] = result.center;
+          // No Mapbox token, go straight to Google
+          needsGoogleFallback = true;
         }
 
-        console.log(`[loadLocationsForCity] ✓ Geocoded "${loc.name}": ${lat}, ${lng} (using ${useGoogleMaps ? 'Google Maps' : 'Mapbox'})`);
+        // Fallback to Google Maps if needed
+        if (needsGoogleFallback && googleApiKey) {
+          console.log(`[loadLocationsForCity] Using Google Maps fallback for: "${loc.address}" in ${loc.cityName}`);
+          const googleResult = await geocodeAddressGoogle(loc.address, googleApiKey, loc.cityName);
+          
+          if (!googleResult) {
+            console.error(`[loadLocationsForCity] ❌ Google Maps also failed for: "${loc.address}" in ${loc.cityName}`);
+            return null;
+          }
+          
+          lat = googleResult.lat;
+          lng = googleResult.lng;
+          usedService = 'Google Maps (fallback)';
+          console.log(`[loadLocationsForCity] ✓ Google Maps geocoded "${loc.name}": ${lat}, ${lng}`);
+        } else if (needsGoogleFallback && !googleApiKey) {
+          // Both failed or no Google key available
+          console.error(`[loadLocationsForCity] ❌ No geocoding service available for: "${loc.address}"`);
+          return null;
+        }
+
+        console.log(`[loadLocationsForCity] ✓ Final result for "${loc.name}": ${lat}, ${lng} (${usedService})`);
         
         // Save to cache
         geocodeCache[cacheKey] = { lat, lng };
