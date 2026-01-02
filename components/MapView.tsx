@@ -18,7 +18,7 @@ interface MapViewProps {
 
 const categoryColors: Record<Category, string> = {
   'Tier 1': '#FF6B6B',
-  'Tier 2': '#4ECDC4',
+  'Tier 2': '#3B82F6', // Blue
   'Tier 3': '#FFE66D',
   'Tier 4': '#95E1D3',
 };
